@@ -10,18 +10,23 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"path/filepath"
 	"strconv"
+
+	"github.com/naminomare/gogutil/fileio"
 )
 
 // https://docs.atlassian.com/atlassian-confluence/REST/6.5.2/#content/{id}/child/attachment
 
+// Attachments
 type Attachments struct {
 	Results []Attachment `json:"results"`
 	Size    int          `json:"size"`
 }
 
+// Attachments ...
 type Attachment struct {
-	Id       string `json:"id"`
+	ID       string `json:"id"`
 	Type     string `json:"type"`
 	Status   string `json:"status"`
 	Title    string `json:"title"`
@@ -32,6 +37,72 @@ type Attachment struct {
 	Version struct {
 		Number int `json:"number"`
 	} `json:"version"`
+}
+
+// AttachmentResults Results
+type AttachmentResults struct {
+	Results []AttachmentFetchResult `json:"results"`
+	Start   float64                 `json:"start"`
+	Limit   float64                 `json:"limit"`
+	Size    float64                 `json:"size"`
+	Links   map[string]string       `json:"_links"`
+}
+
+// AttachmentFetchResult ...
+type AttachmentFetchResult struct {
+	ID         string               `json:"id"`
+	Type       string               `json:"type"`
+	Status     string               `json:"status"`
+	Title      string               `json:"title"`
+	MetaData   AttachmentMetaData   `json:"metadata"`
+	Extensions AttachmentExtensions `json:"extensions"`
+	Expandable AttachmentExpandable `json:"_expandable"`
+	Links      AttachmentLinks      `json:"_links"`
+}
+
+// AttachmentMetaData ...
+type AttachmentMetaData struct {
+	MediaType  string                 `json:"mediaType"`
+	Labels     AttachmentLabels       `json:"labels"`
+	Expandable map[string]interface{} `json:"_expandable"`
+}
+
+// AttachmentLabels ...
+type AttachmentLabels struct {
+	Results []interface{}     `json:"results"`
+	Start   float64           `json:"start"`
+	Limit   float64           `json:"limit"`
+	Size    float64           `json:"size"`
+	Links   map[string]string `json:"_links"`
+}
+
+// AttachmentExtensions Extensions
+type AttachmentExtensions struct {
+	MediaType string  `json:"mediaType"`
+	FileSize  float64 `json:"fileSize"`
+	Comment   string  `json:"comment"`
+}
+
+// AttachmentExpandable expandable
+type AttachmentExpandable struct {
+	Container    string `json:"container"`
+	Operations   string `json:"operations"`
+	Children     string `json:"children"`
+	Restrictions string `json:"restrictions"`
+	History      string `json:"history"`
+	// Ancestors string `json:"ancestors"`
+	// Body string `json:"body"`
+	// Version string `json:"version"`
+	Descendants string `json:"descendants"`
+	Space       string `json:"space"`
+}
+
+// AttachmentLinks links
+type AttachmentLinks struct {
+	Self      string `json:"self"`
+	Webui     string `json:"webui"`
+	Download  string `json:"download"`
+	Thumbnail string `json:"thumbnail"`
 }
 
 func (client *Client) newAttachmentEndpoint(contentID string) (*url.URL, error) {
@@ -245,7 +316,7 @@ func (client *Client) AddUpdateAttachments(contentID string, files []string) ([]
 		if err != nil {
 			attachment, err = client.AddAttachment(contentID, f)
 		} else {
-			attachment, err = client.UpdateAttachment(contentID, attachment.Id[3:], f, true)
+			attachment, err = client.UpdateAttachment(contentID, attachment.ID[3:], f, true)
 		}
 		if err == nil {
 			results = append(results, attachment)
@@ -254,4 +325,80 @@ func (client *Client) AddUpdateAttachments(contentID string, files []string) ([]
 		}
 	}
 	return results, errors
+}
+
+// FetchAttachmentMetaData ...
+func (client *Client) FetchAttachmentMetaData(contentID string) (*AttachmentResults, error) {
+	endpoint, err := client.newAttachmentEndpoint(contentID)
+	if err != nil {
+		return nil, err
+	}
+
+	res, err := client.request(
+		http.MethodGet,
+		endpoint.RawPath,
+		"",
+		"",
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	var attachments AttachmentResults
+	err = json.Unmarshal(res, &attachments)
+	if err != nil {
+		return nil, err
+	}
+	if len(attachments.Results) < 1 {
+		return nil, fmt.Errorf("empty list")
+	}
+
+	return &attachments, err
+}
+
+// DownloadAttachmentsFromPage ...
+func (client *Client) DownloadAttachmentsFromPage(pageID, directory string) error {
+	res, err := client.FetchAttachmentMetaData(pageID)
+	if err != nil {
+		return err
+	}
+
+	err = os.MkdirAll(directory, os.ModePerm)
+	if err != nil {
+		return err
+	}
+
+	for _, v := range res.Results {
+		downloadURL := client.Endpoint + v.Links.Download
+		path, err := fileio.GetNonExistFileName(filepath.Join(directory, v.Title), 1000)
+		if err != nil {
+			return err
+		}
+		err = client.DownloadFromURL(downloadURL, path)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// DownloadFromURL ...
+func (client *Client) DownloadFromURL(url, outputFilepath string) error {
+	resp, err := client.request(
+		http.MethodGet,
+		url,
+		"",
+		"",
+	)
+	if err != nil {
+		return err
+	}
+	fh, err := os.Create(outputFilepath)
+	if err != nil {
+		return err
+	}
+	defer fh.Close()
+	_, err = fh.Write(resp)
+
+	return err
 }
