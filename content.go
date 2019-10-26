@@ -8,6 +8,10 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+func (client *Client) labelEndpoint(contentID string) string {
+	return "/rest/api/content" + contentID + "/label"
+}
+
 // GetContent Returns all content in a Confluence instance.
 // https://developer.atlassian.com/cloud/confluence/rest/#api-content-get
 func (client *Client) GetContent(qp *GetContentQueryParameters) ([]Content, error) {
@@ -96,6 +100,29 @@ func (client *Client) UpdateContent(content *Content, qp *QueryParameters) (Cont
 		log.Error("Unable to unmarshal UpdateContent response. Received: '", string(body), "'")
 	}
 	return *content, err
+}
+
+// AddLabels ...
+func (client *Client) AddLabels(contentID string, labels []string) error {
+	type Label struct {
+		Prefix string `json:"prefix"`
+		Name   string `json:"name"`
+	}
+	var labelsContent []Label
+	for _, l := range labels {
+		labelsContent = append(labelsContent, Label{"global", l})
+	}
+
+	jsonbody, err := json.Marshal(labelsContent)
+	if err != nil {
+		return err
+	}
+	labelEndpoint := client.labelEndpoint(contentID)
+	_, err = client.request("POST", labelEndpoint, "", string(jsonbody))
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // CreateContentBodyParameters query parameters for CreateContent
