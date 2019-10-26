@@ -18,13 +18,13 @@ import (
 
 // https://docs.atlassian.com/atlassian-confluence/REST/6.5.2/#content/{id}/child/attachment
 
-// Attachments
+// Attachments ..
 type Attachments struct {
 	Results []Attachment `json:"results"`
 	Size    int          `json:"size"`
 }
 
-// Attachments ...
+// Attachment ...
 type Attachment struct {
 	ID       string `json:"id"`
 	Type     string `json:"type"`
@@ -105,34 +105,23 @@ type AttachmentLinks struct {
 	Thumbnail string `json:"thumbnail"`
 }
 
-func (client *Client) newAttachmentEndpoint(contentID string) (*url.URL, error) {
-	return url.ParseRequestURI(client.Endpoint + "/content/" + contentID + "/child/attachment")
+func (client *Client) newAttachmentEndpoint(contentID string) string {
+	return "/content/" + contentID + "/child/attachment"
 }
 
-func (client *Client) attachmentEndpoint(contentID, attachmentID string) (*url.URL, error) {
-	if endpoint, err := client.newAttachmentEndpoint(contentID); err == nil {
-		return url.ParseRequestURI(endpoint.String() + "/" + attachmentID)
-	} else {
-		return nil, err
-	}
+func (client *Client) attachmentEndpoint(contentID, attachmentID string) string {
+	return client.newAttachmentEndpoint(contentID) + "/" + attachmentID
 }
 
-func (client *Client) attachmentDataEndpoint(contentID, attachmentID string) (*url.URL, error) {
-	if endpoint, err := client.attachmentEndpoint(contentID, attachmentID); err == nil {
-		return url.ParseRequestURI(endpoint.String() + "/data")
-	} else {
-		return nil, err
-	}
+func (client *Client) attachmentDataEndpoint(contentID, attachmentID string) string {
+	return client.attachmentEndpoint(contentID, attachmentID) + "/data"
 }
 
 // DeleteAttachment ..
 func (client *Client) DeleteAttachment(contentID string, attachmentID string) error {
-	endpoint, err := client.attachmentEndpoint(contentID, attachmentID)
-	if err != nil {
-		return err
-	}
+	endpoint := client.attachmentEndpoint(contentID, attachmentID)
 
-	_, err = client.request("DELETE", endpoint.String(), "", "")
+	_, err := client.request("DELETE", endpoint, "", "")
 	if err != nil {
 		return err
 	}
@@ -142,12 +131,9 @@ func (client *Client) DeleteAttachment(contentID string, attachmentID string) er
 
 // GetAttachment ...
 func (client *Client) GetAttachment(contentID, attachmentID string) (*Attachment, error) {
-	endpoint, err := client.attachmentEndpoint(contentID, attachmentID)
-	if err != nil {
-		return nil, err
-	}
+	endpoint := client.attachmentEndpoint(contentID, attachmentID)
 
-	res, err := client.request("GET", endpoint.String(), "", "")
+	res, err := client.request("GET", endpoint, "", "")
 	if err != nil {
 		return nil, err
 	}
@@ -166,15 +152,13 @@ func (client *Client) GetAttachment(contentID, attachmentID string) (*Attachment
 
 // GetAttachmentByFilename ...
 func (client *Client) GetAttachmentByFilename(contentID, filename string) (*Attachment, error) {
-	endpoint, err := client.newAttachmentEndpoint(contentID)
-	if err != nil {
-		return nil, err
-	}
+	endpoint := client.newAttachmentEndpoint(contentID)
+
 	data := url.Values{}
 	data.Set("filename", filename)
-	endpoint.RawQuery = data.Encode()
+	query := data.Encode()
 
-	res, err := client.request("GET", endpoint.String(), "", "")
+	res, err := client.request("GET", endpoint, query, "")
 	if err != nil {
 		return nil, err
 	}
@@ -226,17 +210,16 @@ func (client *Client) UpdateAttachment(contentID, attachmentID, path string, min
 		return nil, err
 	}
 
-	endpoint, err := client.attachmentDataEndpoint(contentID, attachmentID)
+	endpoint := client.attachmentDataEndpoint(contentID, attachmentID)
 	if err != nil {
 		return nil, err
 	}
-	req, err := http.NewRequest("POST", endpoint.String(), body)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Content-Type", writer.FormDataContentType())
 
-	res, err := client.sendRequest(req)
+	preRequest := func(req *http.Request) {
+		req.Header.Set("Content-Type", writer.FormDataContentType())
+	}
+
+	res, err := client.requestWithFunc("POST", endpoint, "", body, preRequest)
 	if err != nil {
 		return nil, err
 	}
@@ -279,17 +262,15 @@ func (client *Client) AddAttachment(contentID, path string) (*Attachment, error)
 	if err != nil {
 		return nil, err
 	}
-	endpoint, err := client.newAttachmentEndpoint(contentID)
+	endpoint := client.newAttachmentEndpoint(contentID)
 	if err != nil {
 		return nil, err
 	}
-	req, err := http.NewRequest("POST", endpoint.String(), body)
-	if err != nil {
-		return nil, err
+	preRequest := func(req *http.Request) {
+		req.Header.Set("Content-Type", writer.FormDataContentType())
 	}
-	req.Header.Set("Content-Type", writer.FormDataContentType())
 
-	res, err := client.sendRequest(req)
+	res, err := client.requestWithFunc("POST", endpoint, "", body, preRequest)
 	if err != nil {
 		return nil, err
 	}
@@ -329,14 +310,11 @@ func (client *Client) AddUpdateAttachments(contentID string, files []string) ([]
 
 // FetchAttachmentMetaData ...
 func (client *Client) FetchAttachmentMetaData(contentID string) (*AttachmentResults, error) {
-	endpoint, err := client.newAttachmentEndpoint(contentID)
-	if err != nil {
-		return nil, err
-	}
+	endpoint := client.newAttachmentEndpoint(contentID)
 
 	res, err := client.request(
 		http.MethodGet,
-		endpoint.RawPath,
+		endpoint,
 		"",
 		"",
 	)

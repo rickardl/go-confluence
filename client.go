@@ -1,6 +1,7 @@
 package confluence
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -21,16 +22,35 @@ type Client struct {
 	Debug    bool
 }
 
-func (client *Client) sendRequest(req *http.Request) ([]byte, error) {
-	req.Header.Add("Accept", "application/json, */*")
-	req.Header.Add("X-Atlassian-Token", "no-check")
+func (client *Client) request(method string, apiEndpoint string, queryParams string, payloadString string) ([]byte, error) {
+	if client.Debug {
+		log.SetLevel(log.DebugLevel)
+	}
+
+	var payload io.Reader
+
+	url := client.Endpoint + apiEndpoint
+
+	if queryParams != "" {
+		url = url + "?" + queryParams
+	}
+	if payloadString != "" {
+		payload = strings.NewReader(payloadString)
+	}
+
+	log.Debug(fmt.Sprintf("%s %s %s", method, url, payloadString))
+
+	req, _ := http.NewRequest(method, url, payload)
+
+	req.Header["X-Atlassian-Token"] = []string{"no-check"}
+	req.Header["Content-Type"] = []string{"application/json"}
+
 	req.SetBasicAuth(client.Username, client.Password)
 
 	res, _ := http.DefaultClient.Do(req)
 
 	defer res.Body.Close()
 	body, _ := ioutil.ReadAll(res.Body)
-
 	log.Debugf("Response Status Code: %d", res.StatusCode)
 	log.Debugf("Response Body: '%s'", string(body))
 
@@ -57,7 +77,10 @@ func (client *Client) sendRequest(req *http.Request) ([]byte, error) {
 	return body, nil
 }
 
-func (client *Client) request(method string, apiEndpoint string, queryParams string, payloadString string) ([]byte, error) {
+// PreRequestFn ...
+type PreRequestFn func(request *http.Request)
+
+func (client *Client) requestWithFunc(method string, apiEndpoint string, queryParams string, payloadByte *bytes.Buffer, preFn PreRequestFn) ([]byte, error) {
 	if client.Debug {
 		log.SetLevel(log.DebugLevel)
 	}
@@ -69,16 +92,18 @@ func (client *Client) request(method string, apiEndpoint string, queryParams str
 	if queryParams != "" {
 		url = url + "?" + queryParams
 	}
-	if payloadString != "" {
-		payload = strings.NewReader(payloadString)
+	if payloadByte != nil {
+		payload = payloadByte
 	}
 
-	log.Debug(fmt.Sprintf("%s %s %s", method, url, payloadString))
+	log.Debug(fmt.Sprintf("%s %s", method, url))
 
 	req, _ := http.NewRequest(method, url, payload)
 
 	req.Header["X-Atlassian-Token"] = []string{"no-check"}
 	req.Header["Content-Type"] = []string{"application/json"}
+
+	preFn(req)
 
 	req.SetBasicAuth(client.Username, client.Password)
 
