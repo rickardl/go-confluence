@@ -106,7 +106,7 @@ type AttachmentLinks struct {
 }
 
 func (client *Client) newAttachmentEndpoint(contentID string) string {
-	return "/content/" + contentID + "/child/attachment"
+	return "/rest/api/content/" + contentID + "/child/attachment"
 }
 
 func (client *Client) attachmentEndpoint(contentID, attachmentID string) string {
