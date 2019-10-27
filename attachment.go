@@ -124,7 +124,7 @@ func (a *AttachmentLinks) UnmarshalJSON(data []byte) error {
 	a.Thumbnail = strings.Replace(a.Download, "attachments", "thumbnails", 1)
 
 	a.Thumbnail = stripQueryParam(a.Thumbnail, "modificationDate")
-
+	a.Thumbnail = stripQueryParam(a.Thumbnail, "cacheVersion")
 	return nil
 }
 
