@@ -9,7 +9,7 @@ import (
 )
 
 func (client *Client) labelEndpoint(contentID string) string {
-	return "/rest/api/content" + contentID + "/label"
+	return "/rest/api/content/" + contentID + "/label"
 }
 
 // GetContent Returns all content in a Confluence instance.
