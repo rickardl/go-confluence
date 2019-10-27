@@ -123,8 +123,12 @@ func (a *AttachmentLinks) UnmarshalJSON(data []byte) error {
 
 	a.Thumbnail = strings.Replace(a.Download, "attachments", "thumbnails", 1)
 
+	// Dirty hack nees to convert image macro to use ! in storage mode
 	a.Thumbnail = stripQueryParam(a.Thumbnail, "modificationDate")
 	a.Thumbnail = stripQueryParam(a.Thumbnail, "cacheVersion")
+	a.Thumbnail = stripQueryParam(a.Thumbnail, "api")
+	a.Thumbnail = stripQueryParam(a.Thumbnail, "version")
+
 	return nil
 }
 
