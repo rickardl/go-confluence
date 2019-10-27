@@ -122,7 +122,21 @@ func (a *AttachmentLinks) UnmarshalJSON(data []byte) error {
 	}
 
 	a.Thumbnail = strings.Replace(a.Download, "attachments", "thumbnails", 1)
+
+	a.Thumbnail = stripQueryParam(a.Thumbnail, "modificationDate")
+
 	return nil
+}
+
+func stripQueryParam(inURL string, stripKey string) string {
+	u, err := url.Parse(inURL)
+	if err != nil {
+		return inURL
+	}
+	q := u.Query()
+	q.Del(stripKey)
+	u.RawQuery = q.Encode()
+	return u.String()
 }
 
 func (client *Client) newAttachmentEndpoint(contentID string) string {
