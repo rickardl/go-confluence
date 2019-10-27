@@ -2,6 +2,8 @@ package confluence
 
 import (
 	"bytes"
+	"crypto/md5"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -12,6 +14,7 @@ import (
 	"path"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/naminomare/gogutil/fileio"
 )
@@ -103,6 +106,23 @@ type AttachmentLinks struct {
 	Webui     string `json:"webui"`
 	Download  string `json:"download"`
 	Thumbnail string `json:"thumbnail"`
+}
+
+// UnmarshalJSON Custom Unmarshaller
+func (a *AttachmentLinks) UnmarshalJSON(data []byte) error {
+	type Alias AttachmentLinks
+	aux := &struct {
+		*Alias
+	}{
+		Alias: (*Alias)(a),
+	}
+	err := json.Unmarshal(data, &aux)
+	if err != nil {
+		return err
+	}
+
+	a.Thumbnail = strings.Replace(a.Download, "attachments", "thumbnails", 1)
+	return nil
 }
 
 func (client *Client) newAttachmentEndpoint(contentID string) string {
@@ -205,6 +225,19 @@ func (client *Client) UpdateAttachment(contentID, attachmentID, path string, min
 	if err != nil {
 		return nil, err
 	}
+
+	hash := md5.New()
+	_, err = io.Copy(hash, file)
+	if err != nil {
+		return nil, err
+	}
+	hashInBytes := hash.Sum(nil)[:16]
+	md5HashString := hex.EncodeToString(hashInBytes)
+
+	err = writer.WriteField("comment", md5HashString)
+	if err != nil {
+		return nil, err
+	}
 	err = writer.Close()
 	if err != nil {
 		return nil, err
@@ -254,6 +287,19 @@ func (client *Client) AddAttachment(contentID, path string) (*Attachment, error)
 	}
 
 	_, err = io.Copy(part, file)
+	if err != nil {
+		return nil, err
+	}
+
+	hash := md5.New()
+	_, err = io.Copy(hash, file)
+	if err != nil {
+		return nil, err
+	}
+	hashInBytes := hash.Sum(nil)[:16]
+	md5HashString := hex.EncodeToString(hashInBytes)
+
+	err = writer.WriteField("comment", md5HashString)
 	if err != nil {
 		return nil, err
 	}
