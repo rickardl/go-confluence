@@ -361,7 +361,7 @@ func (client *Client) AddUpdateAttachments(contentID string, files []string) ([]
 		if err != nil {
 			attachment, err = client.AddAttachment(contentID, f)
 		} else {
-			attachment, err = client.UpdateAttachment(contentID, attachment.ID[3:], f, true)
+			attachment, err = client.UpdateAttachment(contentID, attachment.ID, f, true)
 		}
 		if err == nil {
 			results = append(results, attachment)
