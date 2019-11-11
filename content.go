@@ -102,15 +102,25 @@ func (client *Client) UpdateContent(content *Content, qp *QueryParameters) (Cont
 	return *content, err
 }
 
+// LabelPrefix ...
+type LabelPrefix string
+
+const (
+	// GlobalPrefix ...
+	GlobalPrefix LabelPrefix = "global"
+	// LocalPrefix ...
+	LocalPrefix LabelPrefix = "local"
+)
+
 // AddLabels ...
-func (client *Client) AddLabels(contentID string, labels []string) error {
+func (client *Client) AddLabels(contentID string, labels []string, prefix LabelPrefix) error {
 	type Label struct {
 		Prefix string `json:"prefix"`
 		Name   string `json:"name"`
 	}
 	var labelsContent []Label
 	for _, l := range labels {
-		labelsContent = append(labelsContent, Label{"global", l})
+		labelsContent = append(labelsContent, Label{string(prefix), l})
 	}
 
 	jsonbody, err := json.Marshal(labelsContent)
@@ -159,7 +169,8 @@ type Content struct {
 		Key string `json:"key,omitempty"`
 	} `json:"space,omitempty"`
 	Version struct {
-		Number int `json:"number,omitempty"`
+		Number  int    `json:"number,omitempty"`
+		Message string `json:"message,omitempty"`
 	} `json:"version,omitempty"`
 	Body struct {
 		Storage struct {
